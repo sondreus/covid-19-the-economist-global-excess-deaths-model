@@ -53,21 +53,13 @@ Y <- df[, dv]
 
 #### Excess deaths figures were inspected manually anomolous drops in excess deaths for very recent dates, which could be due to reporting lags (at the time of model estimation). For detected cases, more investigation was initiated.
 
-# In this case a recent drop in US excess deaths meant checking the underlying CDC data. In line with their estimates of when reporting lags were likely to be influential at the time the model was fitted, some then very recent observations were dropped:
-Y <- Y[!(X$iso3c == "USA" & X$date > 18839)]
-X <- X[!(X$iso3c == "USA" & X$date > 18839), ]
+# Drop very recent observations (<21 days):
+Y <- Y[!X$date > 18959]
+X <- X[!X$date > 18959, ]
 
-# A similar anamolous drop was found in Mumbai at the very tail end of its observations:
+# An anamolous drop was found in Mumbai at the very tail end of its observations. A source confirms that registration for that month was still ongoing (https://timesofindia.indiatimes.com/city/mumbai/excess-deaths-in-city-call-for-scientific-survey-tiss/articleshow/84001199.cms):
 Y <- Y[!(X$iso3c == "IND_Mumbai_City" & X$date > 18744)]
 X <- X[!(X$iso3c == "IND_Mumbai_City" & X$date > 18744),]
-
-# And in Malaysia:
-Y <- Y[!(X$iso3c == "MYS" & X$date > 18748)]
-X <- X[!(X$iso3c == "MYS" & X$date > 18748),]
-
-# Furthermore, the drop-off of almost all series after July 10th suggests region averages will be skewed beyond this point, these very few weeks from just a few countries were dropped. This also reduced probability of bias from reporting lags influencing the model.  
-Y <- Y[!(X$date > 18841)]
-X <- X[!(X$date > 18841), ]
 
 # Equador and Peru have backward adjusted their covid-19 deaths, incorporating excess deaths information. These therefore had to be dropped, as current covid deaths differ greatly from those backward adjusted:
 Y <- Y[!X$iso3c %in% c("PER", "ECU")]
