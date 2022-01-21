@@ -152,10 +152,10 @@ set.seed(112358)
 generate_model_loop(
   X_full = X[!is.na(Y), ], # Defines training set
   Y_full = Y[!is.na(Y)],   # Defines outcome variable
-  B = 3, # Defines number of bootstrap iterations. We use 200.
+  B = 100, # Defines number of bootstrap iterations. We use 200.
   include_main_estimate = T,
-  main_estimate_learning_rate = 0.1,
-  bootstrap_learning_rate = 0.3
+  main_estimate_learning_rate = 0.001,
+  bootstrap_learning_rate = 0.003
                     )
 
 calibration = F
