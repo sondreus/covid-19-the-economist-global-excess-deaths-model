@@ -6,6 +6,7 @@ library(data.table)
 library(lubridate)
 library(countrycode)
 options(scipen=999)
+inspect <- FALSE
 
 # Step 2: import excess deaths data frame with covariates ---------------------------------------
 df <- pred_frame <- data.frame(readRDS("output-data/country_daily_excess_deaths_with_covariates.RDS"))
@@ -53,9 +54,23 @@ Y <- df[, dv]
 
 #### Excess deaths figures were inspected manually anomolous drops in excess deaths for very recent dates, which could be due to reporting lags (at the time of model estimation). For detected cases, more investigation was initiated.
 
-# Drop very recent observations (<21 days):
-Y <- Y[!X$date > 18959]
-X <- X[!X$date > 18959, ]
+if(inspect){
+  library(ggplot2)
+  pdat <- df
+  ggplot(pdat[pdat$date >= as.Date('2021-10-01'), ], 
+         aes(x=as.Date(date, origin = '1970-01-01'), y=daily_excess_deaths_per_100k, col = iso3c))+
+    geom_line()+
+    theme(legend.pos = 'none')+
+    geom_vline(aes(xintercept = as.Date('2021-12-01')))+ # 
+    geom_vline(aes(xintercept = as.Date('2021-12-31')))+
+    geom_line(data = pdat[pdat$date >= as.Date('2021-10-01') & pdat$iso3c == 'USA', ], size = 2)+
+    geom_vline(aes(xintercept = Sys.Date()-28), size = 2)
+}
+
+
+# Drop very recent observations (<28 days):
+Y <- Y[!X$date > Sys.Date()-21]
+X <- X[!X$date > Sys.Date()-21, ]
 
 # An anamolous drop was found in Mumbai at the very tail end of its observations. A source confirms that registration for that month was still ongoing (https://timesofindia.indiatimes.com/city/mumbai/excess-deaths-in-city-call-for-scientific-survey-tiss/articleshow/84001199.cms):
 Y <- Y[!(X$iso3c == "IND_Mumbai_City" & X$date > 18744)]
@@ -129,83 +144,19 @@ for(i in grep("NA_matrix", colnames(X))){
 
 # Step 7: generate model and predictions with stratified bootstrap ---------------------------------------
 
-# Define training set:
-X_full <- X[!is.na(Y), ]
-Y_full <- Y[!is.na(Y)]
+# We first load the model-generation function:
+source('scripts/aux_generate_model_loop.R')
 
-# Define weights, using half-values for subnational units to reflect greater uncertainty in their covariates and estimates. That value was selected based on correlations between covid-deaths and excess deaths in these units (which was much weaker - these also had fewer non-NA observations):
-X_full$weights <- log(X_full$population)
-X_full$weights[nchar(X_full$iso3c) > 3] <- X_full$weights[nchar(X_full$iso3c) > 3]/2
-
-#  Dividing weights if multiple subunits for one country (this matters because observations are weighted by log population rather than absolute population):
-for(i in unique(substr(df$iso3c, 1, 3))){
-  n_units <- length(unique(df$iso3c[substr(df$iso3c, 1, 3) == i & !is.na(df$daily_excess_deaths_per_100k)]))
-  if(n_units > 1){
-    X_full$weights[substr(X_full$iso3c, 1, 3) == i] <-     X_full$weights[substr(X_full$iso3c, 1, 3) == i]/n_units
-  }
-}
-
-# Create container matrix for predictions
-pred_matrix <- data.frame()
-
-# Define predictors
-m_predictors <- setdiff(colnames(X_full), c("iso3c", "region", "weights", "date"))
-
-# Save these predictor names
-saveRDS(m_predictors, "output-data/model-objects/m_predictors.RDS")
-
-# Generate model (= estimate) and bootstrap predictions 
-library(agtboost)
-
-# Define number of bootstrap iterations. We use 200.
-B = 200
-
+# We then use this to generate our main estimate and 200 bootstrap samples
 set.seed(112358)
-
-# Loop over bootstrap iterations
-for(i in 1:(B+1)){
-  cat(paste("\n\nStarting B:", i, "at : ", Sys.time(), "\n\n"))
-
-  # Container for row indicies
-  obs <- c()
-  
-  # Select observations for bootstrap (stratified)
-  if(i == 1){
-    # First fit is estimation (i.e. no random sampling of data)
-    obs <- 1:nrow(X_full)
-  } else {
-    
-    # Other fits use stratified bootstrap
-    iso3cs <- sample(unique(X_full$iso3c), length(unique(X_full$iso3c)), replace = T)
-    
-    for(j in 1:length(iso3cs)){
-      obs <- c(obs, sample(which(X_full$iso3c == iso3cs[j]), length(which(X_full$iso3c == iso3cs[j])), replace = T))
-    }
-  }
-  
-  # Define model weights - we use log(country population)
-  weights_temp <- X_full$weights[obs]/mean(X_full$weights[obs])
-
-  Y_temp <- Y_full[obs]
-  X_temp <- as.matrix(X_full[obs, m_predictors])
-  
-  lr_temp <- ifelse(i == 1, 0.001, 0.003)
-
-  # Fit model:
-  gbt_model <- gbt.train(Y_temp, 
-                         X_temp, 
-                         learning_rate = lr_temp,
-                         nrounds = 35000,
-                         verbose = 200,
-                         algorithm = "global_subset",
-                         weights = weights_temp)
-  
-  # Save model objects
-  gbt.save(gbt_model, paste0("output-data/model-objects/gbt_model_B_", i, ".agtb"))
-  
-  cat(paste("\nCompleted B:", i, "at : ", Sys.time(), "\n\n"))
-  
-}
+generate_model_loop(
+  X_full = X[!is.na(Y), ], # Defines training set
+  Y_full = Y[!is.na(Y)],   # Defines outcome variable
+  B = 3, # Defines number of bootstrap iterations. We use 200.
+  include_main_estimate = T,
+  main_estimate_learning_rate = 0.1,
+  bootstrap_learning_rate = 0.3
+                    )
 
 calibration = F
 if(calibration){

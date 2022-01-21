@@ -88,6 +88,13 @@ country_daily_data <- fread("https://raw.githubusercontent.com/owid/covid-19-dat
 country_daily_data$region[country_daily_data$iso3c == "TWN"] <- "Asia"
 country_daily_data$subregion[country_daily_data$iso3c == "TWN"] <- "Eastern Asia"
 
+
+# Fix for Chinese testing data, which erroneously provides tests per day per 100k for a small interval in 2020 (see source notes here https://ourworldindata.org/coronavirus-testing#china). No testing data for China is at the moment available. 
+country_daily_data$daily_tests[country_daily_data$iso3c == "CHN"] <- NA
+country_daily_data$daily_tests_per_100k[country_daily_data$iso3c == "CHN"] <- NA
+country_daily_data$daily_positive_rate[country_daily_data$iso3c == "CHN"] <- NA
+
+
 # Join excess deaths onto dataframe
 country_daily_excess_deaths <- country_daily_data %>%
   ungroup() %>%
@@ -124,8 +131,10 @@ for(i in c("country","iso3c","region","subregion","population",
                                           country_daily_excess_deaths$iso3c, FUN = function(x){na.omit(x)[1]})
 }
 
+
 # Fill in leading 0s for covid data:
-# Sort
+
+# Order by date
 country_daily_excess_deaths <- country_daily_excess_deaths[order(country_daily_excess_deaths$date), ]
 
 # Define function
@@ -153,11 +162,12 @@ for(i in c("daily_covid_deaths", "daily_covid_deaths_per_100k",
 }
 
 # Generate cumulative tests, cases, deaths, and vaccinations:
-# country_daily_excess_deaths[order(country_daily_excess_deaths$date), ]
 for(i in c("daily_tests", "daily_covid_cases", "daily_covid_deaths", "daily_vaccinations")){
   country_daily_excess_deaths[, paste0("cumulative_", i, "_per_100k")] <- ave(
     country_daily_excess_deaths[, i], country_daily_excess_deaths$iso3c, 
-    FUN = function(x){cumsum(ifelse(is.na(x), 0, x))}
+    FUN = function(x){
+      if(sum(is.na(x)) == length(x)){x} else {
+      cumsum(ifelse(is.na(x), 0, x))}}
   )*(100000/country_daily_excess_deaths$population)
 }
 
