@@ -69,7 +69,7 @@ generate_model_loop <- function(X_full = X[!is.na(Y), ],
                            learning_rate = lr_temp,
                            nrounds = 35000,
                            verbose = 200,
-#                           weights = weights_temp,
+                           weights = weights_temp,
                            algorithm = "global_subset")
     
     # Save model objects
