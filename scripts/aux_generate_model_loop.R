@@ -4,6 +4,7 @@ generate_model_loop <- function(X_full = X[!is.na(Y), ],
                                 Y_full = Y[!is.na(Y)], 
                                  B = 200, 
                                  include_main_estimate = T,
+                                 main_estimate_model_n = 10,
                                  main_estimate_learning_rate = 0.001,
                                  bootstrap_learning_rate = 0.003,
                                  custom_model_index){
@@ -33,14 +34,14 @@ generate_model_loop <- function(X_full = X[!is.na(Y), ],
   library(agtboost)
   
   # Loop over bootstrap iterations (and main estimate if requested)
-  for(i in 1:(B+include_main_estimate)){
+  for(i in 1:(B+include_main_estimate*main_estimate_model_n)){
     cat(paste("\n\nStarting B:", i, "at : ", Sys.time(), "\n\n"))
     
     # Container for row indicies
     obs <- c()
     
     # Select observations for bootstrap (stratified)
-    if(i == 1 & include_main_estimate){
+    if(i %in% 1:main_estimate_model_n & include_main_estimate){
       # First fit is estimation (i.e. no random sampling of data) if main estimate requested
       obs <- 1:nrow(X_full)
     } else {
@@ -59,7 +60,7 @@ generate_model_loop <- function(X_full = X[!is.na(Y), ],
     Y_temp <- Y_full[obs]
     X_temp <- as.matrix(X_full[obs, m_predictors])
     
-    lr_temp <- ifelse(i == 1 & include_main_estimate, 
+    lr_temp <- ifelse(i %in% 1:main_estimate_model_n & include_main_estimate, 
                       main_estimate_learning_rate, 
                       bootstrap_learning_rate)
     
@@ -76,9 +77,8 @@ generate_model_loop <- function(X_full = X[!is.na(Y), ],
     if(!missing(custom_model_index)){
       gbt.save(gbt_model, paste0("output-data/model-objects/gbt_model_B_", custom_model_index, ".agtb"))
     } else {
-    gbt.save(gbt_model, paste0("output-data/model-objects/gbt_model_B_", ifelse(i == 1 & include_main_estimate, i, i+1), ".agtb"))
+    gbt.save(gbt_model, paste0("output-data/model-objects/gbt_model_B_", ifelse(include_main_estimate, i, i+1), ".agtb"))
     }
-
     cat(paste("\nCompleted B:", i, "at : ", Sys.time(), "\n\n"))
     
   }

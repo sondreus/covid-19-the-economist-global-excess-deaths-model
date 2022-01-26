@@ -670,33 +670,6 @@ mob <- mob %>%
 # Add to time-varying data
 time_varying_data[[length(time_varying_data) + 1]] <- mob
 
-# Restrict to country-level data
-mob <- unique(mob[mob$sub_region_1 == "" & mob$sub_region_2 == "" & mob$metro_area == "", ])
-
-# Generate iso3c, rename and select columns
-mob <- mob %>%
-  mutate(
-    iso3c = countrycode(country_region_code, "iso2c", "iso3c"),
-  ) %>%
-  rename(
-    mobility_retail_rec_pct_of_baseline = retail_and_recreation_percent_change_from_baseline,
-    mobility_grocery_and_pharma_pct_of_baseline = grocery_and_pharmacy_percent_change_from_baseline,
-    mobility_parks_pct_of_baseline = parks_percent_change_from_baseline,
-    mobility_transit_rec_pct_of_baseline = transit_stations_percent_change_from_baseline,
-    mobility_workplaces_rec_pct_of_baseline = workplaces_percent_change_from_baseline,
-  ) %>%
-  select(iso3c, 
-         date,
-         mobility_retail_rec_pct_of_baseline,
-         mobility_grocery_and_pharma_pct_of_baseline,
-         mobility_parks_pct_of_baseline,
-         mobility_transit_rec_pct_of_baseline,
-         mobility_workplaces_rec_pct_of_baseline)
-
-# Add to time-varying data
-time_varying_data[[length(time_varying_data) + 1]] <- mob
-
-
 # Add polity response data (source: https://raw.githubusercontent.com/OxCGRT/covid-policy-tracker/master/data/OxCGRT_latest.csv)
 ox <- data.frame(fread("https://raw.githubusercontent.com/OxCGRT/covid-policy-tracker/master/data/OxCGRT_latest.csv"))
 

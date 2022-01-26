@@ -16,7 +16,7 @@ pred_frame <- pred_frame[order(pred_frame$date), ]
 # Select DV
 dv <- "daily_excess_deaths_per_100k"
 
-# Step 3: define predictors ---------------------------------------
+# Step 3: define predictors --------------------  -------------------
 
 # Select features to exclude (as we don't have these for countries where we don't have excess deaths or they are subsumed by other covariates or are country-specific, perfectly co-linear with region, or are not per capita)
 exclude <- c("daily_total_deaths",
@@ -141,7 +141,6 @@ for(i in grep("NA_matrix", colnames(X))){
   X[X[, i] != 1, i] <- 0  
 }
 
-
 # Step 7: generate model and predictions with stratified bootstrap ---------------------------------------
 
 # We first load the model-generation function:
@@ -152,8 +151,9 @@ set.seed(112358)
 generate_model_loop(
   X_full = X[!is.na(Y), ], # Defines training set
   Y_full = Y[!is.na(Y)],   # Defines outcome variable
-  B = 100, # Defines number of bootstrap iterations. We use 200.
+  B = 1, # Defines number of bootstrap iterations. We use 200.
   include_main_estimate = T,
+  main_estimate_model_n = 10,
   main_estimate_learning_rate = 0.001,
   bootstrap_learning_rate = 0.003
                     )

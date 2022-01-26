@@ -139,7 +139,7 @@ library(agtboost)
 m_predictors <- readRDS("output-data/model-objects/m_predictors.RDS")
 
 # Define number of bootstrap iterations. We use 200.
-B = 200
+B = 20
 counter = -1
 
 # Select predictors and create predictor matrix
@@ -164,6 +164,14 @@ for(i in 1:(B+1)){
 
 # Fix column and row names of prediction matrix:
 pred_matrix <- t(pred_matrix)
+
+# Combine main estimate models (with different seeds) via median
+main_estimate_models <- readRDS("output-data/model-objects/main_estimate_models_n.RDS")
+pred_matrix[, 1] = apply(pred_matrix[, 1:main_estimate_models], 1, median, na.rm=T)
+if(main_estimate_models > 1){
+  pred_matrix <- pred_matrix[, c(1, (main_estimate_models+1):ncol(pred_matrix))]
+}
+
 colnames(pred_matrix) <- c("estimate", paste0("B", 1:B))
 rownames(pred_matrix) <- 1:nrow(pred_matrix)
 
