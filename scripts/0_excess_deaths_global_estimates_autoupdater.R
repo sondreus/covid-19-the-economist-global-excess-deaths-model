@@ -167,8 +167,8 @@ pred_matrix <- t(pred_matrix)
 
 # Combine main estimate models (with different seeds) via median
 main_estimate_models <- readRDS("output-data/model-objects/main_estimate_models_n.RDS")
-pred_matrix[, 1] = apply(pred_matrix[, 1:main_estimate_models], 1, median, na.rm=T)
 if(main_estimate_models > 1){
+  pred_matrix[, 1] = apply(pred_matrix[, 1:main_estimate_models], 1, median, na.rm=T)
   pred_matrix <- pred_matrix[, c(1, (main_estimate_models+1):ncol(pred_matrix))]
 }
 
