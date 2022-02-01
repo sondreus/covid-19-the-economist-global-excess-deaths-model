@@ -146,17 +146,20 @@ for(i in grep("NA_matrix", colnames(X))){
 # We first load the model-generation function:
 source('scripts/aux_generate_model_loop.R')
 
-# We then use this to generate our main estimate and 200 bootstrap samples
+# Define number of models with different seeds to combine via median for main estimate
+main_estimate_models <- 10
+saveRDS(main_estimate_models, "output-data/model-objects/main_estimate_models_n.RDS")
+
+# We then use this to generate our main estimate (median of 10 models with different seeds) and 200 bootstrap samples
 set.seed(112358)
 generate_model_loop(
   X_full = X[!is.na(Y), ], # Defines training set
   Y_full = Y[!is.na(Y)],   # Defines outcome variable
-  B = 1, # Defines number of bootstrap iterations. We use 200.
+  B = 200, # Defines number of bootstrap iterations. We use 200.
   include_main_estimate = T,
-  main_estimate_model_n = 10,
+  main_estimate_model_n = main_estimate_models,
   main_estimate_learning_rate = 0.001,
-  bootstrap_learning_rate = 0.003
-                    )
+  bootstrap_learning_rate = 0.003)
 
 calibration = F
 if(calibration){

@@ -139,16 +139,19 @@ library(agtboost)
 m_predictors <- readRDS("output-data/model-objects/m_predictors.RDS")
 
 # Define number of bootstrap iterations. We use 200.
-B = 20
+B = 10
 counter = -1
+
+# Define ensemble size for central estimate
+main_estimate_models <- readRDS("output-data/model-objects/main_estimate_models_n.RDS")
 
 # Select predictors and create predictor matrix
 X <- as.matrix(X[, m_predictors])
 
 # Loop over bootstrap iterations
-for(i in 1:(B+1)){
+for(i in 1:(B+main_estimate_models)){
   counter = counter + 1
-  cat(paste("\n\nStarting B:", counter, "at : ", Sys.time(), "\n\n"))
+  cat(paste("\n\nStarting prediction by model:", counter, "of", B+main_estimate_models, "at : ", Sys.time(), "\n\n"))
   
   # Load model object
   gbt_model <- gbt.load(paste0("output-data/model-objects/gbt_model_B_", i, ".agtb"))
@@ -159,16 +162,15 @@ for(i in 1:(B+1)){
   rm(gbt_model)
   rm(preds)
 
-  cat(paste("\nCompleted B:", counter, "at : ", Sys.time(), "\n\n"))
+  cat(paste("\nCompleted:", counter, "at : ", Sys.time(), "\n\n"))
 }
 
 # Fix column and row names of prediction matrix:
 pred_matrix <- t(pred_matrix)
 
 # Combine main estimate models (with different seeds) via median
-main_estimate_models <- readRDS("output-data/model-objects/main_estimate_models_n.RDS")
 if(main_estimate_models > 1){
-  pred_matrix[, 1] = apply(pred_matrix[, 1:main_estimate_models], 1, median, na.rm=T)
+  pred_matrix[, 1] <- apply(pred_matrix[, 1:main_estimate_models], 1, median, na.rm=T)
   pred_matrix <- pred_matrix[, c(1, (main_estimate_models+1):ncol(pred_matrix))]
 }
 
@@ -215,14 +217,14 @@ if(abs(post_updated_world_total[1] - pre_updated_world_total[1]) > 250000 |
 
 # 7. Train a new bootstrap model ---------------------------------------
 
-# We first drop very recent observations (<28 days):
+# We first drop very recent observations (<21 days):
 Y <- Y[!X$date > Sys.Date()-21]
 X <- X[!X$date > Sys.Date()-21, ]
 
 # We then load the model-generation loop function:
 source('scripts/aux_generate_model_loop.R')
 
-# We then use this to generate one new bootstrap model, overwriting a random prior model (we do not re-generate the main estimate model automatically)
+# We then use this to generate one new bootstrap model, overwriting a random prior model
 generate_model_loop(
   X_full = X[!is.na(Y), ], # Defines training set
   Y_full = Y[!is.na(Y)],   # Defines outcome variable
@@ -230,7 +232,7 @@ generate_model_loop(
   include_main_estimate = F,
   main_estimate_learning_rate = 0.1,
   bootstrap_learning_rate = 0.3,
-  custom_model_index = sample(2:201, 1)
+  custom_model_index = sample(1:201, 1)
 )
 cat('\n\n One bootstrap model successfully re-trained.\n\n')
 
