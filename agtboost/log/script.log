@@ -1,0 +1,16 @@
+========================================================================= 
+Log Path: ./log/script.log 
+Working Directory: C:/Users/sondr/git-projects/agtboost/R-package 
+User Name: ssolstad 
+R Version: 4.0.3 (2020-10-10) 
+Machine: SSOLSTAD x86-64 
+Operating System: Windows 10 x64 build 19042 
+Log Start Time: 2021-06-08 13:51:37 
+========================================================================= 
+
+Error in print(x, ...) : argument "x" is missing, with no default
+ 
+
+NOTE: Log Print Time:  2021-06-08 13:53:56 
+NOTE: Elapsed Time in seconds: 2.31439535220464 
+

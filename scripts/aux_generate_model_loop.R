@@ -1,4 +1,4 @@
-# This script defines a function to generate population-weighted gradient boosted tree models for a given X training matrix and Y outcome vector. By default, it generates a main estimate using all the data, and 200 models based on bootstrap samples. The custom_model_index allows specification of the name used when saving the model.
+# This script defines a function to generate population-weighted gradient boosted tree models for a given X training matrix and Y outcome vector. By default, it generates a main estimate using all the data, and 200 models based on bootstrap samples. The custom_model_index allows specification of the name used when saving the model. The new_predictor_set parameter decided if the current run should update the list of predictors (saved/loaded at "output-data/model-objects/m_predictors.RDS").
 
 generate_model_loop <- function(X_full = X[!is.na(Y), ],
                                 Y_full = Y[!is.na(Y)], 
@@ -7,15 +7,16 @@ generate_model_loop <- function(X_full = X[!is.na(Y), ],
                                  main_estimate_model_n = 10,
                                  main_estimate_learning_rate = 0.001,
                                  bootstrap_learning_rate = 0.003,
-                                 custom_model_index){
+                                 custom_model_index,
+                                new_predictor_set = T){
 
   # Define weights, using half-values for subnational units to reflect greater uncertainty in their covariates and estimates. That value was selected based on correlations between covid-deaths and excess deaths in these units (which was much weaker - these also had fewer non-NA observations):
   X_full$weights <- log(X_full$population)
   X_full$weights[nchar(X_full$iso3c) > 3] <- X_full$weights[nchar(X_full$iso3c) > 3]/2
   
   #  Dividing weights if multiple subunits for one country (this matters because observations are weighted by log population rather than absolute population):
-  for(i in unique(substr(df$iso3c, 1, 3))){
-    n_units <- length(unique(df$iso3c[substr(df$iso3c, 1, 3) == i & !is.na(df$daily_excess_deaths_per_100k)]))
+  for(i in unique(substr(X_full$iso3c, 1, 3))){
+    n_units <- length(unique(X_full$iso3c[substr(X_full$iso3c, 1, 3) == i & !is.na(X_full$daily_excess_deaths_per_100k)]))
     if(n_units > 1){
       X_full$weights[substr(X_full$iso3c, 1, 3) == i] <-     X_full$weights[substr(X_full$iso3c, 1, 3) == i]/n_units
     }
@@ -24,11 +25,15 @@ generate_model_loop <- function(X_full = X[!is.na(Y), ],
   # Create container matrix for predictions
   pred_matrix <- data.frame()
   
-  # Define predictors
-  m_predictors <- setdiff(colnames(X_full), c("iso3c", "region", "weights", "date"))
-  
-  # Save these predictor names
-  saveRDS(m_predictors, "output-data/model-objects/m_predictors.RDS")
+  if(new_predictor_set){
+    # Define predictors
+    m_predictors <- setdiff(colnames(X_full), c("iso3c", "region", "weights", "date"))
+    
+    # Save these predictor names
+    saveRDS(m_predictors, "output-data/model-objects/m_predictors.RDS")
+  } else {
+    m_predictors <- readRDS("output-data/model-objects/m_predictors.RDS")
+  }
   
   # Generate model (= estimate) and bootstrap predictions 
   library(agtboost)

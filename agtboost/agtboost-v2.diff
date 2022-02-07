@@ -1,0 +1,193 @@
+diff --git a/R-package/inst/include/node.hpp b/R-package/inst/include/node.hpp
+index 06f0c4b..d941ef8 100644
+--- a/R-package/inst/include/node.hpp
++++ b/R-package/inst/include/node.hpp
+@@ -55,7 +55,7 @@ public:
+     void print_child_branches_2(const std::string& prefix, const node* nptr, bool isLeft);
+     
+     void serialize(node* nptr, std::ofstream& f);
+-    bool deSerialize(node *nptr, std::ifstream& f, int& lineNum);
++    bool deSerialize(node *nptr, std::ifstream& f, int& lineNum, int& numRead);
+ };
+ 
+ /*
+@@ -105,22 +105,16 @@ void node::serialize(node* nptr, std::ofstream& f)
+     
+ }
+ 
+-bool node::deSerialize(node *nptr, std::ifstream& f, int& lineNum)
++bool node::deSerialize(node *nptr, std::ifstream& f, int& lineNum, int& numRead)
+ {
+     
+     int MARKER = -1;
+-    
+-    // Start at beginning
+-    f.seekg(0, std::ios::beg);
+-    
+-    // Run until line lineNum is found
++
+     std::string stemp;
+-    for(int i=0; i<= lineNum; i++)
+-    {
+-        if(!std::getline(f,stemp)){
+-            nptr = NULL;
+-            return false;
+-        }
++    // Run until line lineNum is found
++    if(!std::getline(f,stemp)){
++        nptr = NULL;
++        return false;
+     }
+     
+     // Check stemp for MARKER
+@@ -142,13 +136,14 @@ bool node::deSerialize(node *nptr, std::ifstream& f, int& lineNum)
+ 
+     // Increment lineNum
+     lineNum++;
++    numRead++;
+     
+     // Node check value
+     bool node_success = false;
+     
+     // Left node
+     node* new_left = new node;
+-    node_success = deSerialize(new_left, f, lineNum);
++    node_success = deSerialize(new_left, f, lineNum, numRead);
+     if(node_success)
+     {
+         nptr->left = new_left;
+@@ -159,7 +154,7 @@ bool node::deSerialize(node *nptr, std::ifstream& f, int& lineNum)
+     // Right node
+     node_success = false;
+     node* new_right = new node;
+-    node_success = deSerialize(new_right, f, lineNum);
++    node_success = deSerialize(new_right, f, lineNum, numRead);
+     if(node_success)
+     {
+         nptr->right = new_right;
+@@ -550,4 +545,4 @@ void node::split_node(Tvec<double> &g, Tvec<double> &h, Tvec<int> &ind, Tmat<dou
+ 
+ 
+ 
+-#endif
+\ No newline at end of file
++#endif
+diff --git a/R-package/inst/include/tree.hpp b/R-package/inst/include/tree.hpp
+index 2f7b0a1..aafa2c0 100644
+--- a/R-package/inst/include/tree.hpp
++++ b/R-package/inst/include/tree.hpp
+@@ -31,7 +31,7 @@ public:
+     int getNumLeaves();
+     void print_tree(int type);
+     void serialize(GBTREE* tptr, std::ofstream& f);
+-    bool deSerialize(GBTREE* tptr,  std::ifstream& f, int& lineNum);
++    bool deSerialize(GBTREE* tptr,  std::ifstream& f, int& lineNum, int &numRead);
+     void importance(Tvec<double> &importance_vector, double learning_rate);
+     
+ };
+@@ -55,38 +55,18 @@ void GBTREE::serialize(GBTREE *tptr, std::ofstream& f)
+     serialize(tptr->next_tree, f);
+ }
+ 
+-bool GBTREE::deSerialize(GBTREE *tptr, std::ifstream& f, int& lineNum)
++bool GBTREE::deSerialize(GBTREE *tptr, std::ifstream& f, int& lineNum, int &numRead)
+ {
+-    
+-    int MARKER = -1;
+-    
+-    // Start at beginning
+-    f.seekg(0, std::ios::beg);
+-    
+-    // Run until line lineNum is found
+-    std::string stemp;
+-    for(int i=0; i<= lineNum; i++)
+-    {
+-        if(!std::getline(f,stemp)){
+-            tptr = NULL;
+-            return false;
+-        }
+-    }
+-    
+-    // Check stemp for MARKER
+-    std::istringstream istemp(stemp);
+-    int val;
+-    istemp >> val;
+-    if(val == MARKER){ 
++    // If not MARKER, deserialize root node (unincremented lineNum)
++    tptr->root = new node;
++    const bool success = tptr->root->deSerialize(tptr->root, f, lineNum, numRead); // lineNum passed by reference and incremented
++    if (!success) {
+         tptr = NULL;
+         return false;
+     }
+-
+-    // If not MARKER, deserialize root node (unincremented lineNum)
+-    tptr->root = new node;
+-    tptr->root->deSerialize(tptr->root, f, lineNum); // lineNum passed by reference and incremented
++    numRead++;
+     GBTREE* new_tree = new GBTREE;
+-    bool new_tree_exist = deSerialize(new_tree, f, lineNum);
++    bool new_tree_exist = deSerialize(new_tree, f, lineNum, numRead);
+     if(new_tree_exist)
+     {
+         tptr->next_tree = new_tree;
+@@ -410,4 +390,4 @@ int GBTREE::getNumLeaves(){
+ 
+ 
+ 
+-#endif
+\ No newline at end of file
++#endif
+diff --git a/R-package/src/agtboost.cpp b/R-package/src/agtboost.cpp
+index 1121017..288a46a 100644
+--- a/R-package/src/agtboost.cpp
++++ b/R-package/src/agtboost.cpp
+@@ -7,8 +7,6 @@
+ 
+ #include "agtboost.hpp"
+ 
+-
+-
+ // ---------------- ENSEMBLE ----------------
+ ENSEMBLE::ENSEMBLE(){
+     this->first_tree = NULL;
+@@ -89,9 +87,10 @@ void ENSEMBLE::deSerialize(ENSEMBLE *eptr, std::ifstream& f)
+     
+     // Start recurrence
+     int lineNum = 6;
++    int numRead = 1;
+     eptr->first_tree = new GBTREE;
+-    eptr->first_tree->deSerialize(eptr->first_tree, f, lineNum);
+-    
++    eptr->first_tree->deSerialize(eptr->first_tree, f, lineNum, numRead);
++    std::cerr << "DEBUG: Number of trees+nodes " << numRead << std::endl;
+ }
+ 
+ void ENSEMBLE::save_model(std::string filepath)
+@@ -103,10 +102,19 @@ void ENSEMBLE::save_model(std::string filepath)
+ }
+ void ENSEMBLE::load_model(std::string filepath)
+ {
++    const auto current_time = std::chrono::system_clock::now();
++
+     std::ifstream f;
+     f.open(filepath.c_str());
+     this->deSerialize(this, f);
+     f.close();
++
++    const auto after_load = std::chrono::system_clock::now();
++    const auto elapsed = (after_load - current_time);
++    std::cerr
++        << "LUKAS: Loading the model took "
++        << std::chrono::duration_cast<std::chrono::milliseconds>(elapsed).count()
++        << " milliseconds" << std::endl;
+ }
+ 
+  
+@@ -651,4 +659,4 @@ RCPP_MODULE(aGTBModule) {
+         .method("get_overdispersion", &GBT_COUNT_AUTO::get_overdispersion)
+         .method("get_model_name", &GBT_COUNT_AUTO::get_model_name)
+     ;
+-}
+\ No newline at end of file
++}

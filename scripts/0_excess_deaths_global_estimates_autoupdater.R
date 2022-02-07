@@ -16,7 +16,7 @@ start_time <- Sys.time()
 
 # For memory efficiency, this is executed within a temporary local environment created by the update_data function:
 update_data <- function(){source("scripts/1_excess_deaths_global_estimates_data_generation.R", local = TRUE)}
-# update_data()  
+update_data()  
 
 # 2. Load updated data ---------------------------------------
 dat <- readRDS("output-data/country_daily_excess_deaths_with_covariates.RDS")
@@ -74,6 +74,8 @@ if(diagnostics){
     geom_vline(aes(xintercept = as.Date("2021-05-10")))+
     xlab("")+ylab("")
   ggsave("plots/diagnostic_2_NA_by_variable_and_day.png", height = 14, width = 10)
+  
+  rm(pdat)
 }
 
 # 4. Generate data matrix ------------------------------------------------------ 
@@ -121,9 +123,9 @@ Y$order <- 1:nrow(Y)
 Y <- merge(Y[, c('iso3c', 'date', 'order')], 
            df[, c('iso3c', 'date', 'daily_excess_deaths_per_100k')], all.x = T)
 Y <- Y[order(Y$order), 'daily_excess_deaths_per_100k']
+X_train <- X
 
 # Clean workspace for memory efficiency
-rm(pdat)
 rm(temp)
 rm(df)
 
@@ -139,7 +141,7 @@ library(agtboost)
 m_predictors <- readRDS("output-data/model-objects/m_predictors.RDS")
 
 # Define number of bootstrap iterations. We use 200.
-B = 10
+B = 200
 counter = -1
 
 # Define ensemble size for central estimate
@@ -216,26 +218,31 @@ if(abs(post_updated_world_total[1] - pre_updated_world_total[1]) > 250000 |
 }
 
 # 7. Train a new bootstrap model ---------------------------------------
-
-# We first drop very recent observations (<21 days):
-Y <- Y[!X$date > Sys.Date()-21]
-X <- X[!X$date > Sys.Date()-21, ]
-
-# We then load the model-generation loop function:
-source('scripts/aux_generate_model_loop.R')
-
-# We then use this to generate one new bootstrap model, overwriting a random prior model
-generate_model_loop(
-  X_full = X[!is.na(Y), ], # Defines training set
-  Y_full = Y[!is.na(Y)],   # Defines outcome variable
-  B = 1, 
-  include_main_estimate = F,
-  main_estimate_learning_rate = 0.1,
-  bootstrap_learning_rate = 0.3,
-  custom_model_index = sample(1:201, 1)
-)
-cat('\n\n One bootstrap model successfully re-trained.\n\n')
+if(FALSE){
+  X <- X_train
+  X$daily_excess_deaths_per_100k <- Y
+  
+  # We first drop very recent observations (<21 days):
+  Y <- Y[!X$date > Sys.Date()-21]
+  X <- X[!X$date > Sys.Date()-21, ]
+  
+  # We then load the model-generation loop function:
+  source('scripts/aux_generate_model_loop.R')
+  
+  # We then use this to generate one new bootstrap model, overwriting a random prior model
+  generate_model_loop(
+    X_full = X[!is.na(Y), ], # Defines training set
+    Y_full = Y[!is.na(Y)],   # Defines outcome variable
+    B = 1, 
+    include_main_estimate = F,
+    main_estimate_learning_rate = 0.1,
+    bootstrap_learning_rate = 0.3,
+    custom_model_index = 99999,
+    new_predictor_set = F
+  )
+  cat('\n\n One bootstrap model successfully re-trained.\n\n')
+  }
 
 end_time <- Sys.time()
-
+  
 print(paste("Total time:", end_time - start_time))
